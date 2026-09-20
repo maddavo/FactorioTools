@@ -9,6 +9,7 @@ on:
   workflow_dispatch:
 
 permissions:
+  actions: read
   contents: read
   pages: write
   id-token: write
@@ -35,7 +36,7 @@ jobs:
           global-json-file: global.json
       - name: Setup Pages
         id: pages
-        uses: actions/configure-pages@v3
+        uses: actions/configure-pages@v5
       - name: Restore WebAssembly tools
         run: dotnet workload restore
 
@@ -45,7 +46,7 @@ jobs:
       - name: Build
         run: dotnet publish ${{ env.BUILD_PATH }} --configuration Release --output publish
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: "${{ env.BUILD_PATH }}/publish/wwwroot"
 
@@ -63,4 +64,4 @@ jobs:
           submodules: recursive
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v1
+        uses: actions/deploy-pages@v4
