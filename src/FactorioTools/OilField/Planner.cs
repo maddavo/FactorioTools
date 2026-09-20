@@ -189,6 +189,11 @@ public static class Planner
             Validate.AllEntitiesHavePower(context);
         }
 
+        if (options.AddHeatPipes)
+        {
+            AddHeatPipes.Execute(context);
+        }
+
         var missingPumpjacks = initialPumpjackCount - context.CenterToTerminals.Count;
         if (missingPumpjacks > 0)
         {

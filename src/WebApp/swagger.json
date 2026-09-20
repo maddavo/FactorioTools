@@ -268,6 +268,11 @@
             "description": "Whether or not to add beacons around the pumpjacks.",
             "default": true
           },
+          "addHeatPipes": {
+            "type": "boolean",
+            "description": "Whether or not to add a connected heat-pipe network for the pumpjacks, fluid pipes, and beacons. This is useful on Aquilo, where those entities freeze unless they are adjacent to a heat source.",
+            "default": false
+          },
           "optimizePipes": {
             "type": "boolean",
             "description": "Whether or not to use the pipe optimizer after each pipe strategy is executed. If set to true, the best solution\r\nfound will still be used, meaning if the unoptimized pipe plan performs better, it will be preferred over the\r\ncorresponding optimized pipe plan.",
@@ -416,6 +421,7 @@
       "OilFieldPlanRequestResponse": {
         "required": [
           "addBeacons",
+          "addHeatPipes",
           "addElectricPoles",
           "addFbeOffset",
           "beaconEntityName",
@@ -448,6 +454,10 @@
           "addBeacons": {
             "type": "boolean",
             "description": "Whether or not to add beacons around the pumpjacks."
+          },
+          "addHeatPipes": {
+            "type": "boolean",
+            "description": "Whether or not to add a connected heat-pipe network for the pumpjacks, fluid pipes, and beacons. This is useful on Aquilo, where those entities freeze unless they are adjacent to a heat source."
           },
           "optimizePipes": {
             "type": "boolean",

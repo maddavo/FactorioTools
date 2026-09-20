@@ -20,6 +20,7 @@ public static class GridToBlueprintString
         { EntityNames.Vanilla.MediumElectricPole, (1, 1) },
         { EntityNames.Vanilla.Pipe, (1, 1) },
         { EntityNames.Vanilla.PipeToGround, (1, 1) },
+        { EntityNames.Vanilla.HeatPipe, (1, 1) },
         { EntityNames.Vanilla.Pumpjack, (3, 3) },
         { EntityNames.Vanilla.SmallElectricPole, (1, 1) },
         { EntityNames.Vanilla.Substation, (2, 2) },
@@ -83,6 +84,14 @@ public static class GridToBlueprintString
                     {
                         EntityNumber = nextEntityNumber++,
                         Name = EntityNames.Vanilla.Pipe,
+                        Position = position,
+                    });
+                    break;
+                case HeatPipe:
+                    entities.Add(new Entity
+                    {
+                        EntityNumber = nextEntityNumber++,
+                        Name = EntityNames.Vanilla.HeatPipe,
                         Position = position,
                     });
                     break;

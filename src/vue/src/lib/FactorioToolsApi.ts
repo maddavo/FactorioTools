@@ -85,6 +85,11 @@ export interface OilFieldPlanRequest {
    */
   addBeacons?: boolean;
   /**
+   * Whether or not to add a connected heat-pipe network for the pumpjacks, fluid pipes, and beacons. This is useful on Aquilo, where those entities freeze unless they are adjacent to a heat source.
+   * @default false
+   */
+  addHeatPipes?: boolean;
+  /**
    * Whether or not to use the pipe optimizer after each pipe strategy is executed. If set to true, the best solution
    * found will still be used, meaning if the unoptimized pipe plan performs better, it will be preferred over the
    * corresponding optimized pipe plan.
@@ -219,6 +224,8 @@ export interface OilFieldPlanRequestResponse {
   useUndergroundPipes: boolean;
   /** Whether or not to add beacons around the pumpjacks. */
   addBeacons: boolean;
+  /** Whether or not to add a connected heat-pipe network for the pumpjacks, fluid pipes, and beacons. This is useful on Aquilo, where those entities freeze unless they are adjacent to a heat source. */
+  addHeatPipes: boolean;
   /**
    * Whether or not to use the pipe optimizer after each pipe strategy is executed. If set to true, the best solution
    * found will still be used, meaning if the unoptimized pipe plan performs better, it will be preferred over the

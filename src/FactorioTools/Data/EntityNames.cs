@@ -8,6 +8,7 @@ public class EntityNames
         
         public const string Pipe = "pipe";
         public const string PipeToGround = "pipe-to-ground";
+        public const string HeatPipe = "heat-pipe";
 
         public const string SmallElectricPole = "small-electric-pole";
         public const string MediumElectricPole = "medium-electric-pole";

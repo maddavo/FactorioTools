@@ -51,6 +51,7 @@
     <ResponseErrorView v-if="normalizeError" :error="normalizeError" />
     <PumpjacksForm :show-advanced-options="useAdvancedOptions" />
     <BeaconForm :show-advanced-options="useAdvancedOptions" />
+    <AquiloForm />
     <ElectricPoleSelect :show-advanced-options="useAdvancedOptions" />
     <PlannerForm :show-advanced-options="useAdvancedOptions" v-show="useAdvancedOptions" />
     <div class="d-grid gap-2">
@@ -102,6 +103,7 @@
 <script lang="ts">
 import { ApiError, ApiResult, getPlan, normalize } from '../lib/OilFieldPlanner'
 import BeaconForm from '../components/BeaconForm.vue';
+import AquiloForm from '../components/AquiloForm.vue';
 import ElectricPoleSelect from '../components/ElectricPoleForm.vue';
 import PlannerForm from '../components/PlannerForm.vue';
 import PumpjacksForm from '../components/PumpjacksForm.vue';
@@ -301,6 +303,6 @@ export default {
       initializeOilFieldStore(this.$route.query)
     }
   },
-  components: { ElectricPoleSelect, BeaconForm, PumpjacksForm, PlannerForm, ResponseErrorView, OilFieldPlanView, CopyButton, AlgorithmStep }
+  components: { ElectricPoleSelect, BeaconForm, AquiloForm, PumpjacksForm, PlannerForm, ResponseErrorView, OilFieldPlanView, CopyButton, AlgorithmStep }
 }
 </script>

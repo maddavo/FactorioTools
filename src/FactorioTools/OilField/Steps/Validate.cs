@@ -1,4 +1,6 @@
 ﻿using System.Collections.Generic;
+using System;
+using System.Linq;
 using Knapcode.FactorioTools.Data;
 using static Knapcode.FactorioTools.OilField.Helpers;
 
@@ -177,6 +179,48 @@ public static class Validate
             }
 
             GetElectricPoleCoverage(context, poweredEntities, electricPoleCenters);
+        }
+    }
+
+    public static void HeatPipesAreConnected(Context context)
+    {
+        if (!context.Options.ValidateSolution)
+        {
+            return;
+        }
+
+        var heatPipes = context.Grid.EntityLocations.EnumerateItems()
+            .Where(location => context.Grid[location] is HeatPipe)
+            .ToHashSet();
+
+        if (heatPipes.Count == 0)
+        {
+            throw new FactorioToolsException("The Aquilo heat-pipe network is empty.");
+        }
+
+        var visited = new HashSet<Location>();
+        var queue = new Queue<Location>();
+        var start = heatPipes.First();
+        queue.Enqueue(start);
+        visited.Add(start);
+        Span<Location> adjacent = stackalloc Location[4];
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            context.Grid.GetAdjacent(adjacent, current);
+            for (var i = 0; i < adjacent.Length; i++)
+            {
+                var next = adjacent[i];
+                if (next.IsValid && heatPipes.Contains(next) && visited.Add(next))
+                {
+                    queue.Enqueue(next);
+                }
+            }
+        }
+
+        if (visited.Count != heatPipes.Count)
+        {
+            throw new FactorioToolsException("The Aquilo heat pipes are not fully connected.");
         }
     }
 }

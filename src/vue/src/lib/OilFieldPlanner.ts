@@ -8,6 +8,7 @@ type RequestPropertyGetters = {
 
 const requestPropertyGetters: RequestPropertyGetters = {
   addBeacons: (state) => state.addBeacons,
+  addHeatPipes: (state) => state.addHeatPipes,
   addElectricPoles: (state) => state.addElectricPoles,
   addFbeOffset: (_) => false,
   beaconEntityName: (state) => state.beaconEntityName.trim(),

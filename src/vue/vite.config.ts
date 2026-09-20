@@ -19,8 +19,8 @@ if (process.env.VERCEL_GIT_COMMIT_REF) {
 }
 
 const commit = execSync('git rev-parse --short HEAD').toString().trim()
-const shortVersion = execSync('git describe --abbrev=0').toString().trim()
-let version = execSync('git describe --long --dirty').toString().trim()
+const shortVersion = execSync('git describe --abbrev=0 --tags --always').toString().trim()
+let version = execSync('git describe --long --dirty --tags --always').toString().trim()
 if (version == `${shortVersion}-0-g${commit}` && branch == 'main') {
   version = shortVersion
 } else {
