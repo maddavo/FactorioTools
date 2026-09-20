@@ -44,7 +44,7 @@ jobs:
         run: dotnet restore ${{ env.BUILD_PATH }}
 
       - name: Build
-        run: dotnet publish ${{ env.BUILD_PATH }} --configuration Release --output publish
+        run: dotnet publish ${{ env.BUILD_PATH }} --configuration Release --output ${{ env.BUILD_PATH }}/publish
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
