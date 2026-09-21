@@ -27,6 +27,11 @@
         <a class="dismiss">🗙</a>
     </div>
     <script src="_framework/blazor.webassembly.js"></script>
+    <script>
+        window.factorioTools = {
+            copy: async (text) => await navigator.clipboard.writeText(text)
+        };
+    </script>
 </body>
 
 </html>

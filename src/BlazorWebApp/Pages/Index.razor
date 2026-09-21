@@ -1,112 +1,141 @@
-﻿@page "/"
-@using System.Diagnostics;
-@using Knapcode.FactorioTools.OilField;
+@page "/"
+@using System.Diagnostics
+@using Knapcode.FactorioTools.OilField
+@inject IJSRuntime JS
 
 <PageTitle>Factorio oil field planner</PageTitle>
 
-<h1>Factorio oil field planner</h1>
+<h1>Factorio oil field planner @(Advanced ? "🧙‍♂️" : "🐣")</h1>
 <p>This planner runs entirely in your browser. No blueprint data is sent to a server.</p>
 
-<div class="mb-3">
-    <label class="form-label" for="input-blueprint">Input blueprint</label>
-    <textarea class="form-control font-monospace" id="input-blueprint" rows="6" @bind="InputBlueprint" @bind:event="oninput" spellcheck="false"></textarea>
+<div class="row row-cols-md-auto g-2 mb-3">
+    <div class="col"><button class="btn btn-info" @onclick="ToggleAdvanced">Use @(Advanced ? "simple" : "advanced") options</button></div>
+    <div class="col"><button class="btn btn-warning" @onclick="Reset">Reset</button></div>
 </div>
 
-<div class="form-check mb-2">
-    <input class="form-check-input" id="add-beacons" type="checkbox" @bind="AddBeacons" />
-    <label class="form-check-label" for="add-beacons">Add beacons</label>
-</div>
+<fieldset class="border p-3 mb-3">
+    <legend class="float-none w-auto px-2">Input blueprint</legend>
+    <div class="mb-2"><a class="btn btn-link btn-sm" href="@FbeInputUrl" target="_blank" rel="noopener noreferrer">View in FBE</a> <button class="btn btn-info btn-sm" @onclick="Normalize" disabled="@CannotSubmit">Normalize blueprint</button></div>
+    <textarea class="form-control font-monospace" id="input-blueprint" placeholder="paste blueprint string here" rows="4" @bind="InputBlueprint" @bind:event="oninput" spellcheck="false"></textarea>
+</fieldset>
 
-<div class="form-check mb-2">
-    <input class="form-check-input" id="add-electric-poles" type="checkbox" @bind="AddElectricPoles" />
-    <label class="form-check-label" for="add-electric-poles">Add electric poles</label>
-</div>
+<fieldset class="border p-3 mb-3">
+    <legend class="float-none w-auto px-2">Pumpjacks</legend>
+    <label class="form-label" for="pumpjack-module">Pumpjack module</label>
+    <select class="form-select" id="pumpjack-module" @bind="PumpjackModule">@foreach (var module in PumpjackModuleOptions) { <option value="@module.Value">@module.Label</option> }</select>
+    @if (Advanced) { <label class="form-label mt-2" for="pumpjack-module-custom">Custom module internal name</label><input class="form-control" id="pumpjack-module-custom" @bind="PumpjackModule" /> }
+</fieldset>
 
-@if (AddElectricPoles)
+<fieldset class="border p-3 mb-3">
+    <legend class="float-none w-auto px-2">Beacons</legend>
+    <div class="form-check"><input class="form-check-input" id="add-beacons" type="checkbox" @bind="AddBeacons" /><label class="form-check-label" for="add-beacons">Add beacons</label></div>
+    @if (AddBeacons)
+    {
+        <label class="form-label mt-3" for="beacon-module">Beacon module</label>
+        <select class="form-select" id="beacon-module" @bind="BeaconModule">@foreach (var module in BeaconModuleOptions) { <option value="@module.Value">@module.Label</option> }</select>
+        @if (Advanced)
+        {
+            <label class="form-label mt-2" for="beacon-module-custom">Custom beacon module internal name</label>
+            <input class="form-control" id="beacon-module-custom" @bind="BeaconModule" />
+            <div class="row g-3 mt-1">
+                <div class="col-md-4"><label class="form-label">Beacon entity internal name</label><input class="form-control" @bind="BeaconEntityName" /></div>
+                <div class="col-md-2"><label class="form-label">Module slots</label><input class="form-control" type="number" min="1" @bind="BeaconModuleSlots" /></div>
+                <div class="col-md-2"><label class="form-label">Entity width</label><input class="form-control" type="number" min="1" @bind="BeaconWidth" /></div>
+                <div class="col-md-2"><label class="form-label">Entity height</label><input class="form-control" type="number" min="1" @bind="BeaconHeight" /></div>
+                <div class="col-md-2"><label class="form-label">Supply width</label><input class="form-control" type="number" min="1" @bind="BeaconSupplyWidth" /></div>
+                <div class="col-md-2"><label class="form-label">Supply height</label><input class="form-control" type="number" min="1" @bind="BeaconSupplyHeight" /></div>
+            </div>
+            <div class="form-check mt-3"><input class="form-check-input" id="overlap-beacons" type="checkbox" @bind="OverlapBeacons" /><label class="form-check-label" for="overlap-beacons">Allow overlapping beacon effects</label></div>
+        }
+    }
+</fieldset>
+
+<fieldset class="border p-3 mb-3">
+    <legend class="float-none w-auto px-2">Aquilo</legend>
+    <div class="form-check"><input class="form-check-input" id="add-heat-pipes" type="checkbox" @bind="AddHeatPipes" /><label class="form-check-label" for="add-heat-pipes">Add heat pipes</label></div>
+    <div class="form-text">Creates one connected heat-pipe network beside planned pumpjacks, fluid pipes, and beacons. Connect it to a heating tower or reactor after placement.</div>
+</fieldset>
+
+<fieldset class="border p-3 mb-3">
+    <legend class="float-none w-auto px-2">Electric poles</legend>
+    <div class="form-check"><input class="form-check-input" id="add-electric-poles" type="checkbox" @bind="AddElectricPoles" /><label class="form-check-label" for="add-electric-poles">Add electric poles</label></div>
+    @if (AddElectricPoles)
+    {
+        <label class="form-label mt-3" for="electric-pole-type">Entity</label>
+        <select class="form-select" id="electric-pole-type" @bind="ElectricPoleEntityName" @bind:after="SetKnownElectricPole"><option value="small-electric-pole">Small electric pole</option><option value="medium-electric-pole">Medium electric pole</option><option value="big-electric-pole">Big electric pole</option><option value="substation">Substation</option></select>
+        @if (Advanced)
+        {
+            <div class="row g-3 mt-1">
+                <div class="col-md-4"><label class="form-label">Custom entity internal name</label><input class="form-control" @bind="ElectricPoleEntityName" /></div>
+                <div class="col-md-2"><label class="form-label">Wire reach</label><input class="form-control" type="number" min="1" step="0.5" @bind="ElectricPoleWireReach" /></div>
+                <div class="col-md-2"><label class="form-label">Entity width</label><input class="form-control" type="number" min="1" @bind="ElectricPoleWidth" /></div>
+                <div class="col-md-2"><label class="form-label">Entity height</label><input class="form-control" type="number" min="1" @bind="ElectricPoleHeight" /></div>
+                <div class="col-md-2"><label class="form-label">Supply width</label><input class="form-control" type="number" min="1" @bind="ElectricPoleSupplyWidth" /></div>
+                <div class="col-md-2"><label class="form-label">Supply height</label><input class="form-control" type="number" min="1" @bind="ElectricPoleSupplyHeight" /></div>
+            </div>
+        }
+    }
+</fieldset>
+
+@if (Advanced)
 {
-    <div class="mb-3">
-        <label class="form-label" for="electric-pole-type">Electric pole type</label>
-        <select class="form-select" id="electric-pole-type" @bind="ElectricPoleType">
-            <option value="small">Small electric pole</option>
-            <option value="medium">Medium electric pole</option>
-            <option value="big">Big electric pole</option>
-            <option value="substation">Substation</option>
-        </select>
-        <div class="form-text">Each plan uses one selected pole type.</div>
-    </div>
+    <fieldset class="border p-3 mb-3">
+        <legend class="float-none w-auto px-2">Planner options</legend>
+        <div class="form-check"><input class="form-check-input" id="use-underground-pipes" type="checkbox" @bind="UseUndergroundPipes" /><label class="form-check-label" for="use-underground-pipes">Use underground pipes</label></div>
+        <div class="form-check"><input class="form-check-input" id="optimize-pipes" type="checkbox" @bind="OptimizePipes" /><label class="form-check-label" for="optimize-pipes">Optimize pipes</label></div>
+        <div class="form-check"><input class="form-check-input" id="validate-solution" type="checkbox" @bind="ValidateSolution" /><label class="form-check-label" for="validate-solution">Validate solution</label></div>
+        <div class="row mt-3"><div class="col-md-6"><strong>Pipe strategies</strong>
+            <div class="form-check"><input class="form-check-input" id="pipe-fbe-original" type="checkbox" @bind="PipeFbeOriginal" /><label class="form-check-label" for="pipe-fbe-original">FBE original</label></div>
+            <div class="form-check"><input class="form-check-input" id="pipe-fbe" type="checkbox" @bind="PipeFbe" /><label class="form-check-label" for="pipe-fbe">FBE</label></div>
+            <div class="form-check"><input class="form-check-input" id="pipe-delaunay" type="checkbox" @bind="PipeDelaunay" /><label class="form-check-label" for="pipe-delaunay">Connected centers Delaunay</label></div>
+            <div class="form-check"><input class="form-check-input" id="pipe-mst" type="checkbox" @bind="PipeDelaunayMst" /><label class="form-check-label" for="pipe-mst">Connected centers Delaunay MST</label></div>
+            <div class="form-check"><input class="form-check-input" id="pipe-flute" type="checkbox" @bind="PipeFlute" /><label class="form-check-label" for="pipe-flute">Connected centers FLUTE</label></div>
+        </div><div class="col-md-6"><strong>Beacon strategies</strong>
+            <div class="form-check"><input class="form-check-input" id="beacon-fbe-original" type="checkbox" @bind="BeaconFbeOriginal" disabled="@(!AddBeacons)" /><label class="form-check-label" for="beacon-fbe-original">FBE original</label></div>
+            <div class="form-check"><input class="form-check-input" id="beacon-fbe" type="checkbox" @bind="BeaconFbe" disabled="@(!AddBeacons)" /><label class="form-check-label" for="beacon-fbe">FBE</label></div>
+            <div class="form-check"><input class="form-check-input" id="beacon-snug" type="checkbox" @bind="BeaconSnug" disabled="@(!AddBeacons)" /><label class="form-check-label" for="beacon-snug">Snug</label></div>
+        </div></div>
+    </fieldset>
 }
 
-<div class="form-check mb-3">
-    <input class="form-check-input" id="add-heat-pipes" type="checkbox" @bind="AddHeatPipes" />
-    <label class="form-check-label" for="add-heat-pipes">Add heat pipes for Aquilo</label>
-    <div class="form-text">Adds one connected heat-pipe network beside pumpjacks, fluid pipes, and beacons. Connect it to a heating tower or reactor after placement.</div>
-</div>
+<div class="d-grid gap-2 mb-3"><button class="btn btn-primary btn-lg" @onclick="Plan" disabled="@CannotSubmit">@(Loading ? "Planning..." : "Plan oil field")</button></div>
+@if (!string.IsNullOrEmpty(Error)) { <div class="alert alert-danger">@Error</div> }
 
-<button class="btn btn-primary mb-3" @onclick="Plan" disabled="@Loading">@(Loading ? "Planning..." : "Plan oil field")</button>
-
-@if (!string.IsNullOrEmpty(Error))
+@if (Summary is not null)
 {
-    <div class="alert alert-danger">@Error</div>
-}
-
-@if (!string.IsNullOrEmpty(OutputBlueprint))
-{
-    <div class="mb-3">
-        <label class="form-label" for="output-blueprint">Output blueprint</label>
-        <textarea class="form-control font-monospace" id="output-blueprint" rows="6" readonly>@OutputBlueprint</textarea>
-        <div class="form-text">@Status</div>
-    </div>
+    <section class="border p-3 mt-3">
+        <div class="mb-3"><button class="btn btn-info" @onclick="CopyBlueprint">Copy blueprint</button> <a class="btn btn-link" href="@FbeOutputUrl" target="_blank" rel="noopener noreferrer">View in FBE</a></div>
+        @if (Summary.RotatedPumpjacks > 0) { <div class="alert alert-warning"><strong>Rotation needed!</strong> At least one pumpjack was rotated from its original position.</div> }
+        <table class="table table-sm"><thead><tr><th>Rank</th><th>Plan</th>@if (AddBeacons) { <th>Beacon effects</th><th>Beacons</th> }<th>Pipes</th>@if (UseUndergroundPipes) { <th>Pipes without underground</th> }</tr></thead><tbody>@foreach (var item in Plans) { <tr class="@item.Css"><th>@item.Rank @if (item.Alternate) { <small>(alternate)</small> }</th><td>@Describe(item.Plan)</td>@if (AddBeacons) { <td>@item.Plan.BeaconEffectCount</td><td>@item.Plan.BeaconCount</td> }<td>@item.Plan.PipeCount</td>@if (UseUndergroundPipes) { <td>@item.Plan.PipeCountWithoutUnderground</td> }</tr> }</tbody></table>
+        <label class="form-label" for="output-blueprint">Oil field blueprint</label><textarea class="form-control font-monospace" id="output-blueprint" rows="6" readonly>@OutputBlueprint</textarea><div class="form-text">@Status</div>
+    </section>
 }
 
 @code {
-    public string Error { get; set; } = string.Empty;
-    public string InputBlueprint { get; set; } = "0eJyMj70OwjAMhN/lZg8NbHkVhFB/rMrQuFGSIqoq707aMiCVgcWSz+fP5wXNMLEPogl2gbSjRtjLgii91sOqae0YFn5y/l63DxDS7FdFEjtkgmjHL1iTrwTWJEl4Z2zNfNPJNRyKgX6w/BjLwqjrpQI5E+ZSC7WTwO0+qTIdYKc/YKbaaOaAK0G38Pbre8KTQ/wY8hsAAP//AwAEfF3F";
-    public string OutputBlueprint { get; set; } = string.Empty;
-    public string Status { get; set; } = string.Empty;
-    public bool Loading { get; set; }
-    public bool AddBeacons { get; set; } = true;
-    public bool AddElectricPoles { get; set; } = true;
-    public bool AddHeatPipes { get; set; }
-    public string ElectricPoleType { get; set; } = "medium";
-
-    private void Plan()
-    {
-        if (string.IsNullOrEmpty(InputBlueprint))
-        {
-            return;
-        }
-
-        OutputBlueprint = string.Empty;
-        Error = string.Empty;
-        Loading = true;
-        Status = "Running...";
-        var sw = Stopwatch.StartNew();
-
-        try
-        {
-            var options = ElectricPoleType switch
-            {
-                "small" => OilFieldOptions.ForSmallElectricPole,
-                "big" => OilFieldOptions.ForBigElectricPole,
-                "substation" => OilFieldOptions.ForSubstation,
-                _ => OilFieldOptions.ForMediumElectricPole,
-            };
-            options.AddBeacons = AddBeacons;
-            options.AddElectricPoles = AddElectricPoles;
-            options.AddHeatPipes = AddHeatPipes;
-            var bp = ParseBlueprint.Execute(InputBlueprint);
-            (var context, _) = Planner.Execute(options, bp);
-            OutputBlueprint = GridToBlueprintString.Execute(context, addFbeOffset: false, addAvoidEntities: false);
-            Status = "Done: " + sw.Elapsed;
-        }
-        catch (Exception ex)
-        {
-            Error = ex.Message;
-            Status = "Error.";
-        }
-        finally
-        {
-            Loading = false;
-        }
-    }
+    private static readonly (string Label, string Value)[] PumpjackModuleOptions = [("None", ""), ("Efficiency module", "effectivity-module"), ("Efficiency module 2", "effectivity-module-2"), ("Efficiency module 3", "effectivity-module-3"), ("Productivity module", "productivity-module"), ("Productivity module 2", "productivity-module-2"), ("Productivity module 3", "productivity-module-3"), ("Speed module", "speed-module"), ("Speed module 2", "speed-module-2"), ("Speed module 3", "speed-module-3")];
+    private static readonly (string Label, string Value)[] BeaconModuleOptions = [("None", ""), ("Efficiency module", "effectivity-module"), ("Efficiency module 2", "effectivity-module-2"), ("Efficiency module 3", "effectivity-module-3"), ("Speed module", "speed-module"), ("Speed module 2", "speed-module-2"), ("Speed module 3", "speed-module-3")];
+    private string InputBlueprint = ""; private string OutputBlueprint = ""; private string Error = ""; private string Status = ""; private bool Loading; private bool Advanced;
+    private bool AddBeacons = true; private bool AddHeatPipes; private bool AddElectricPoles = true; private bool UseUndergroundPipes = true; private bool OptimizePipes = true; private bool ValidateSolution; private bool OverlapBeacons = true;
+    private string PumpjackModule = "productivity-module-3"; private string BeaconModule = "speed-module-3"; private int BeaconModuleSlots = 2; private string BeaconEntityName = "beacon"; private int BeaconSupplyWidth = 9; private int BeaconSupplyHeight = 9; private int BeaconWidth = 3; private int BeaconHeight = 3;
+    private string ElectricPoleEntityName = "medium-electric-pole"; private int ElectricPoleSupplyWidth = 7; private int ElectricPoleSupplyHeight = 7; private double ElectricPoleWireReach = 9; private int ElectricPoleWidth = 1; private int ElectricPoleHeight = 1;
+    private bool PipeFbeOriginal; private bool PipeFbe = true; private bool PipeDelaunay = true; private bool PipeDelaunayMst = true; private bool PipeFlute = true; private bool BeaconFbeOriginal; private bool BeaconFbe = true; private bool BeaconSnug = true;
+    private OilFieldPlanSummary? Summary;
+    private bool CannotSubmit => string.IsNullOrWhiteSpace(InputBlueprint) || Loading;
+    private string FbeInputUrl => $"https://fbe.teoxoy.com/?source={Uri.EscapeDataString(InputBlueprint)}"; private string FbeOutputUrl => $"https://fbe.teoxoy.com/?source={Uri.EscapeDataString(OutputBlueprint)}";
+    private IEnumerable<DisplayPlan> Plans => GetPlans();
+    private void ToggleAdvanced() => Advanced = !Advanced;
+    private void Reset() { InputBlueprint = OutputBlueprint = Error = Status = ""; Summary = null; Advanced = false; AddBeacons = true; AddHeatPipes = false; AddElectricPoles = true; UseUndergroundPipes = true; OptimizePipes = true; ValidateSolution = false; OverlapBeacons = true; PumpjackModule = "productivity-module-3"; BeaconModule = "speed-module-3"; BeaconModuleSlots = 2; BeaconEntityName = "beacon"; BeaconSupplyWidth = BeaconSupplyHeight = 9; BeaconWidth = BeaconHeight = 3; ElectricPoleEntityName = "medium-electric-pole"; SetKnownElectricPole(); PipeFbeOriginal = false; PipeFbe = PipeDelaunay = PipeDelaunayMst = PipeFlute = true; BeaconFbeOriginal = false; BeaconFbe = BeaconSnug = true; }
+    private void SetKnownElectricPole() { switch (ElectricPoleEntityName) { case "small-electric-pole": ElectricPoleWidth = ElectricPoleHeight = 1; ElectricPoleSupplyWidth = ElectricPoleSupplyHeight = 5; ElectricPoleWireReach = 7.5; break; case "medium-electric-pole": ElectricPoleWidth = ElectricPoleHeight = 1; ElectricPoleSupplyWidth = ElectricPoleSupplyHeight = 7; ElectricPoleWireReach = 9; break; case "big-electric-pole": ElectricPoleWidth = ElectricPoleHeight = 2; ElectricPoleSupplyWidth = ElectricPoleSupplyHeight = 4; ElectricPoleWireReach = 30; break; case "substation": ElectricPoleWidth = ElectricPoleHeight = 2; ElectricPoleSupplyWidth = ElectricPoleSupplyHeight = 18; ElectricPoleWireReach = 18; break; } }
+    private void Normalize() => Execute(() => { var clean = CleanBlueprint.Execute(ParseBlueprint.Execute(InputBlueprint)); InputBlueprint = GridToBlueprintString.SerializeBlueprint(clean, false); }, "Blueprint normalized.");
+    private void Plan() => Execute(() => { var options = new OilFieldOptions { AddBeacons = AddBeacons, AddHeatPipes = AddHeatPipes, AddElectricPoles = AddElectricPoles, UseUndergroundPipes = UseUndergroundPipes, OptimizePipes = OptimizePipes, ValidateSolution = ValidateSolution, OverlapBeacons = OverlapBeacons, BeaconEntityName = BeaconEntityName.Trim(), BeaconSupplyWidth = BeaconSupplyWidth, BeaconSupplyHeight = BeaconSupplyHeight, BeaconWidth = BeaconWidth, BeaconHeight = BeaconHeight, ElectricPoleEntityName = ElectricPoleEntityName.Trim(), ElectricPoleSupplyWidth = ElectricPoleSupplyWidth, ElectricPoleSupplyHeight = ElectricPoleSupplyHeight, ElectricPoleWireReach = ElectricPoleWireReach, ElectricPoleWidth = ElectricPoleWidth, ElectricPoleHeight = ElectricPoleHeight, PipeStrategies = PipeStrategies(), BeaconStrategies = BeaconStrategies(), PumpjackModules = Modules(PumpjackModule, 2), BeaconModules = Modules(BeaconModule, BeaconModuleSlots) }; var result = Planner.Execute(options, ParseBlueprint.Execute(InputBlueprint)); Summary = result.Summary; OutputBlueprint = GridToBlueprintString.Execute(result.Context, false, false); });
+    private void Execute(Action action, string? success = null) { Error = ""; Loading = true; var sw = Stopwatch.StartNew(); try { action(); Status = success ?? $"Done: {sw.Elapsed}"; } catch (Exception ex) { Summary = null; OutputBlueprint = ""; Error = ex.Message; Status = "Error."; } finally { Loading = false; } }
+    private List<PipeStrategy> PipeStrategies() => [.. new[] { PipeFbeOriginal ? PipeStrategy.FbeOriginal : (PipeStrategy?)null, PipeFbe ? PipeStrategy.Fbe : null, PipeDelaunay ? PipeStrategy.ConnectedCentersDelaunay : null, PipeDelaunayMst ? PipeStrategy.ConnectedCentersDelaunayMst : null, PipeFlute ? PipeStrategy.ConnectedCentersFlute : null }.Where(x => x.HasValue).Select(x => x!.Value)];
+    private List<BeaconStrategy> BeaconStrategies() => [.. new[] { BeaconFbeOriginal ? BeaconStrategy.FbeOriginal : (BeaconStrategy?)null, BeaconFbe ? BeaconStrategy.Fbe : null, BeaconSnug ? BeaconStrategy.Snug : null }.Where(x => x.HasValue).Select(x => x!.Value)];
+    private static Dictionary<string, int> Modules(string name, int slots) => string.IsNullOrWhiteSpace(name) ? [] : new() { [name.Trim()] = slots };
+    private async Task CopyBlueprint() => await JS.InvokeVoidAsync("factorioTools.copy", OutputBlueprint);
+    private IEnumerable<DisplayPlan> GetPlans() { if (Summary is null) yield break; OilFieldPlan? previous = null; var rank = 0; foreach (var group in new[] { (Summary.SelectedPlans, "table-primary", false), (Summary.AlternatePlans, "table-info", true), (Summary.UnusedPlans, "", false) }) foreach (var plan in group.Item1) { if (previous is null || !plan.IsEquivalent(previous)) rank++; previous = plan; yield return new(plan, rank, group.Item2, group.Item3); } }
+    private static string Describe(OilFieldPlan plan) => $"{PipeName(plan.PipeStrategy)}{(plan.OptimizePipes ? " → optimize" : "")}{(plan.BeaconStrategy is null ? "" : " → " + BeaconName(plan.BeaconStrategy.Value))}";
+    private static string PipeName(PipeStrategy value) => value switch { PipeStrategy.FbeOriginal => "FBE original", PipeStrategy.Fbe => "FBE", PipeStrategy.ConnectedCentersDelaunay => "Connected centers Delaunay", PipeStrategy.ConnectedCentersDelaunayMst => "Connected centers Delaunay MST", PipeStrategy.ConnectedCentersFlute => "Connected centers FLUTE", _ => value.ToString() };
+    private static string BeaconName(BeaconStrategy value) => value switch { BeaconStrategy.FbeOriginal => "FBE original", BeaconStrategy.Fbe => "FBE", BeaconStrategy.Snug => "snug", _ => value.ToString() };
+    private sealed record DisplayPlan(OilFieldPlan Plan, int Rank, string Css, bool Alternate);
 }
