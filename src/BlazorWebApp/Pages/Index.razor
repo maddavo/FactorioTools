@@ -17,6 +17,25 @@
     <label class="form-check-label" for="add-beacons">Add beacons</label>
 </div>
 
+<div class="form-check mb-2">
+    <input class="form-check-input" id="add-electric-poles" type="checkbox" @bind="AddElectricPoles" />
+    <label class="form-check-label" for="add-electric-poles">Add electric poles</label>
+</div>
+
+@if (AddElectricPoles)
+{
+    <div class="mb-3">
+        <label class="form-label" for="electric-pole-type">Electric pole type</label>
+        <select class="form-select" id="electric-pole-type" @bind="ElectricPoleType">
+            <option value="small">Small electric pole</option>
+            <option value="medium">Medium electric pole</option>
+            <option value="big">Big electric pole</option>
+            <option value="substation">Substation</option>
+        </select>
+        <div class="form-text">Each plan uses one selected pole type.</div>
+    </div>
+}
+
 <div class="form-check mb-3">
     <input class="form-check-input" id="add-heat-pipes" type="checkbox" @bind="AddHeatPipes" />
     <label class="form-check-label" for="add-heat-pipes">Add heat pipes for Aquilo</label>
@@ -46,7 +65,9 @@
     public string Status { get; set; } = string.Empty;
     public bool Loading { get; set; }
     public bool AddBeacons { get; set; } = true;
+    public bool AddElectricPoles { get; set; } = true;
     public bool AddHeatPipes { get; set; }
+    public string ElectricPoleType { get; set; } = "medium";
 
     private void Plan()
     {
@@ -63,8 +84,15 @@
 
         try
         {
-            var options = OilFieldOptions.ForMediumElectricPole;
+            var options = ElectricPoleType switch
+            {
+                "small" => OilFieldOptions.ForSmallElectricPole,
+                "big" => OilFieldOptions.ForBigElectricPole,
+                "substation" => OilFieldOptions.ForSubstation,
+                _ => OilFieldOptions.ForMediumElectricPole,
+            };
             options.AddBeacons = AddBeacons;
+            options.AddElectricPoles = AddElectricPoles;
             options.AddHeatPipes = AddHeatPipes;
             var bp = ParseBlueprint.Execute(InputBlueprint);
             (var context, _) = Planner.Execute(options, bp);
