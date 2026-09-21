@@ -5,8 +5,9 @@ using System.Linq;
 namespace Knapcode.FactorioTools.OilField;
 
 /// <summary>
-/// Adds one orthogonally connected heat-pipe network. A heat pipe one tile away, including diagonally, keeps an
-/// Aquilo entity warm. The network is deliberately left exposed so it can be connected to a heating tower or reactor.
+/// Adds one orthogonally connected heat-pipe network. Aquilo entities must directly share an edge with a hot heat
+/// pipe; diagonal proximity is not sufficient. The network is deliberately left exposed so it can be connected to a
+/// heating tower or reactor.
 /// </summary>
 public static class AddHeatPipes
 {
@@ -23,35 +24,10 @@ public static class AddHeatPipes
 
     public static void Execute(Context context)
     {
-        var targets = GetTargets(context.Grid);
-        var heatPipes = new HashSet<Location>();
-
-        foreach (var target in targets)
+        var heatPipes = TryPlan(context.Grid);
+        if (heatPipes is null)
         {
-            if (IsHeated(target, heatPipes))
-            {
-                continue;
-            }
-
-            var candidates = GetCandidates(context.Grid, target);
-            if (candidates.Count == 0)
-            {
-                throw new FactorioToolsException("No valid heat-pipe placement could be found for an Aquilo entity.", badInput: true);
-            }
-
-            if (heatPipes.Count == 0)
-            {
-                heatPipes.Add(candidates[0]);
-                continue;
-            }
-
-            var path = FindShortestPath(context.Grid, heatPipes, candidates);
-            if (path is null)
-            {
-                throw new FactorioToolsException("No route could be found to connect the Aquilo heat pipes.", badInput: true);
-            }
-
-            heatPipes.UnionWith(path);
+            throw new FactorioToolsException("No heat-pipe-compatible layout could be found for Aquilo.", badInput: true);
         }
 
         foreach (var location in heatPipes)
@@ -61,7 +37,7 @@ public static class AddHeatPipes
 
         if (context.Options.ValidateSolution)
         {
-            foreach (var target in targets)
+            foreach (var target in GetTargets(context.Grid))
             {
                 if (!IsHeated(target, heatPipes))
                 {
@@ -73,7 +49,196 @@ public static class AddHeatPipes
         }
     }
 
-    private static List<HeatTarget> GetTargets(SquareGrid grid)
+    /// <summary>
+    /// Reserves the initial connected network before fluid pipes and beacons are planned. Those planners therefore
+    /// route around heat instead of forcing heat to fit through whatever space they happen to leave afterwards.
+    /// </summary>
+    public static void ReserveForPumpjacks(Context context)
+    {
+        var terminals = new HashSet<Location>(context.LocationToTerminals.Keys);
+        var heatPipes = TryPlan(context.Grid, excludedLocations: terminals);
+        if (heatPipes is null)
+        {
+            throw new FactorioToolsException("No heat-pipe-compatible layout could be found for Aquilo.", badInput: true);
+        }
+
+        foreach (var location in heatPipes)
+        {
+            if (context.Grid.IsEmpty(location))
+            {
+                context.Grid.AddEntity(location, new HeatPipe(context.Grid.GetId()));
+            }
+        }
+    }
+
+    /// <summary>
+    /// Determines whether a planned pipe and beacon layout can accommodate the mandatory Aquilo heat network.
+    /// This is used while choosing a layout, before it is committed to the planner grid.
+    /// </summary>
+    public static bool CanPlan(SquareGrid grid) => TryPlan(grid) is not null;
+
+    /// <summary>
+    /// Plans a heat spine for the pumpjacks and the proposed ordinary pipes. It is used before beacons are placed,
+    /// making the required network a reservation the beacon planner must work around.
+    /// </summary>
+    public static IReadOnlyCollection<Location>? PlanForPipes(SquareGrid grid, ILocationSet pipes)
+        => TryPlan(grid, pipes.EnumerateItems());
+
+    /// <summary>
+    /// Checks a prospective beacon placement without changing the working grid. Beacon planners use this while
+    /// choosing candidates, so that they leave space for the mandatory heat network instead of merely discovering
+    /// the conflict after all beacons have been placed.
+    /// </summary>
+    private static HashSet<Location>? TryPlan(
+        SquareGrid grid,
+        IEnumerable<Location>? additionalPipeLocations = null,
+        IReadOnlySet<Location>? excludedLocations = null)
+    {
+        var targets = GetTargets(grid, additionalPipeLocations);
+        var targetToCandidates = new Dictionary<HeatTarget, List<Location>>(targets.Count);
+        foreach (var target in targets)
+        {
+            var candidates = GetCandidates(grid, target, excludedLocations);
+            if (candidates.Count == 0)
+            {
+                return null;
+            }
+
+            targetToCandidates.Add(target, candidates);
+        }
+
+        var existingHeatPipes = grid.EntityLocations
+            .EnumerateItems()
+            .Where(location => grid[location] is HeatPipe)
+            .ToHashSet();
+        if (targets.Count == 0)
+        {
+            return existingHeatPipes;
+        }
+
+        // Different first branches make materially different spines in dense oil fields.  The old implementation
+        // tried one branch and could therefore report a layout impossible even though moving the backbone solved it.
+        // Explore a bounded, deterministic selection of starts; each attempt remains a linear-time grid search.
+        var starts = targets
+            .OrderBy(target => targetToCandidates[target].Count)
+            .ThenBy(target => target.Locations.Min(location => location.GetManhattanDistance(grid.Middle)))
+            .Take(8)
+            .SelectMany(target => targetToCandidates[target]
+                .OrderBy(location => location.GetManhattanDistance(grid.Middle))
+                .ThenBy(location => location.Y)
+                .ThenBy(location => location.X)
+                .Take(8)
+                .Select(location => (target, location)))
+            .ToList();
+
+        foreach (var (firstTarget, firstLocation) in starts)
+        {
+            var result = TryPlanFromStart(grid, targets, targetToCandidates, existingHeatPipes, firstTarget, firstLocation);
+            if (result is not null)
+            {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    private static HashSet<Location>? TryPlanFromStart(
+        SquareGrid grid,
+        List<HeatTarget> targets,
+        Dictionary<HeatTarget, List<Location>> targetToCandidates,
+        HashSet<Location> existingHeatPipes,
+        HeatTarget firstTarget,
+        Location firstLocation)
+    {
+        var heatPipes = new HashSet<Location>(existingHeatPipes) { firstLocation };
+        var remainingTargets = new HashSet<HeatTarget>(targets);
+        remainingTargets.Remove(firstTarget);
+
+        while (remainingTargets.Count > 0)
+        {
+            var targetsAlreadyHeated = remainingTargets.Where(target => IsHeated(target, heatPipes)).ToList();
+            if (targetsAlreadyHeated.Count > 0)
+            {
+                foreach (var target in targetsAlreadyHeated)
+                {
+                    remainingTargets.Remove(target);
+                }
+
+                continue;
+            }
+
+            // One breadth-first search finds the closest candidate belonging to any remaining target. The previous
+            // implementation ran a full search for every target at every branch, which made large fields needlessly
+            // slow while offering no better route choice.
+            var candidateToTarget = new Dictionary<Location, HeatTarget>();
+            foreach (var target in remainingTargets.OrderBy(target => targetToCandidates[target].Count))
+            {
+                foreach (var candidate in targetToCandidates[target])
+                {
+                    candidateToTarget.TryAdd(candidate, target);
+                }
+            }
+
+            var path = FindShortestPath(grid, heatPipes, candidateToTarget.Keys);
+            if (path is null || path.Count == 0)
+            {
+                return null;
+            }
+
+            heatPipes.UnionWith(path);
+            remainingTargets.Remove(candidateToTarget[path[0]]);
+        }
+
+        // A finished Aquilo network must not be a sealed island inside the generated layout. Reserve a route to the
+        // edge of the planning grid so the player can join it to a heating tower or reactor outside the blueprint.
+        var outside = GetOutsideDestinations(grid);
+        var outsidePath = FindShortestPath(grid, heatPipes, outside);
+        if (outsidePath is null)
+        {
+            return null;
+        }
+
+        heatPipes.UnionWith(outsidePath);
+
+        return heatPipes;
+    }
+
+    private static IReadOnlyCollection<Location> GetOutsideDestinations(SquareGrid grid)
+    {
+        var destinations = new List<Location>();
+        for (var x = 0; x < grid.Width; x++)
+        {
+            var top = new Location(x, 0);
+            var bottom = new Location(x, grid.Height - 1);
+            if (grid.IsEmpty(top))
+            {
+                destinations.Add(top);
+            }
+            if (grid.IsEmpty(bottom))
+            {
+                destinations.Add(bottom);
+            }
+        }
+
+        for (var y = 1; y < grid.Height - 1; y++)
+        {
+            var left = new Location(0, y);
+            var right = new Location(grid.Width - 1, y);
+            if (grid.IsEmpty(left))
+            {
+                destinations.Add(left);
+            }
+            if (grid.IsEmpty(right))
+            {
+                destinations.Add(right);
+            }
+        }
+
+        return destinations;
+    }
+
+    private static List<HeatTarget> GetTargets(SquareGrid grid, IEnumerable<Location>? additionalPipeLocations = null)
     {
         var idToTarget = new Dictionary<int, HeatTarget>();
 
@@ -104,6 +269,24 @@ public static class AddHeatPipes
             target.Locations.Add(location);
         }
 
+        if (additionalPipeLocations is not null)
+        {
+            var plannedPipeId = int.MinValue;
+            foreach (var location in additionalPipeLocations)
+            {
+                // The planned pipe locations are not on the working grid while beacon candidates are generated.
+                // Heat each one as an ordinary pipe would be heated in the completed plan.
+                while (idToTarget.ContainsKey(plannedPipeId))
+                {
+                    plannedPipeId++;
+                }
+
+                var target = new HeatTarget(plannedPipeId++);
+                target.Locations.Add(location);
+                idToTarget.Add(target.Id, target);
+            }
+        }
+
         return idToTarget.Values
             .OrderBy(t => t.Locations.Min(l => l.Y))
             .ThenBy(t => t.Locations.Min(l => l.X))
@@ -114,40 +297,40 @@ public static class AddHeatPipes
     {
         foreach (var location in target.Locations)
         {
-            for (var x = -1; x <= 1; x++)
+            if (heatPipes.Contains(location.Translate(1, 0))
+                || heatPipes.Contains(location.Translate(-1, 0))
+                || heatPipes.Contains(location.Translate(0, 1))
+                || heatPipes.Contains(location.Translate(0, -1)))
             {
-                for (var y = -1; y <= 1; y++)
-                {
-                    if (heatPipes.Contains(location.Translate(x, y)))
-                    {
-                        return true;
-                    }
-                }
+                return true;
             }
         }
 
         return false;
     }
 
-    private static List<Location> GetCandidates(SquareGrid grid, HeatTarget target)
+    private static List<Location> GetCandidates(SquareGrid grid, HeatTarget target, IReadOnlySet<Location>? excludedLocations = null)
     {
         var candidates = new HashSet<Location>();
         foreach (var location in target.Locations)
         {
-            for (var x = -1; x <= 1; x++)
-            {
-                for (var y = -1; y <= 1; y++)
-                {
-                    var candidate = location.Translate(x, y);
-                    if (grid.IsInBounds(candidate) && grid.IsEmpty(candidate))
-                    {
-                        candidates.Add(candidate);
-                    }
-                }
-            }
+            AddCandidate(location.Translate(1, 0));
+            AddCandidate(location.Translate(-1, 0));
+            AddCandidate(location.Translate(0, 1));
+            AddCandidate(location.Translate(0, -1));
         }
 
         return candidates.OrderBy(l => l.Y).ThenBy(l => l.X).ToList();
+
+        void AddCandidate(Location candidate)
+        {
+            if (grid.IsInBounds(candidate)
+                && grid.IsEmpty(candidate)
+                && (excludedLocations is null || !excludedLocations.Contains(candidate)))
+            {
+                candidates.Add(candidate);
+            }
+        }
     }
 
     private static IReadOnlyList<Location>? FindShortestPath(

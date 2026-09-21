@@ -14,6 +14,19 @@ public static class PlanBeacons
             context.Grid.AddEntity(pipe, new TemporaryEntity(context.Grid.GetId()));
         }
 
+        IReadOnlyCollection<Location>? reservedHeatPipes = null;
+        if (context.Options.AddHeatPipes)
+        {
+            reservedHeatPipes = AddHeatPipes.PlanForPipes(context.Grid, pipes);
+            if (reservedHeatPipes is not null)
+            {
+                foreach (var heatPipe in reservedHeatPipes)
+                {
+                    context.Grid.AddEntity(heatPipe, new TemporaryEntity(context.Grid.GetId()));
+                }
+            }
+        }
+
         var solutions = new List<BeaconSolution>(context.Options.BeaconStrategies.Count);
 
         var completedStrategies = new CountedBitArray((int)BeaconStrategy.Snug + 1); // max value
@@ -35,6 +48,14 @@ public static class PlanBeacons
             completedStrategies[(int)strategy] = true;
 
             solutions.Add(new BeaconSolution(strategy, beacons, effects));
+        }
+
+        if (reservedHeatPipes is not null)
+        {
+            foreach (var heatPipe in reservedHeatPipes)
+            {
+                context.Grid.RemoveEntity(heatPipe);
+            }
         }
 
         foreach (var pipe in pipes.EnumerateItems())

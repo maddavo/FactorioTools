@@ -18,6 +18,9 @@ public class AddHeatPipesTest : BasePlannerTest
         var expectedCount = context.Grid.GetEntities().OfType<HeatPipe>().Count();
         Assert.NotEqual(0, expectedCount);
         Assert.Equal(expectedCount, outputBlueprint.Entities.Count(entity => entity.Name == EntityNames.Vanilla.HeatPipe));
+        Assert.Contains(context.Grid.EntityLocations.EnumerateItems(), location =>
+            context.Grid[location] is HeatPipe
+            && (location.X == 0 || location.Y == 0 || location.X == context.Grid.Width - 1 || location.Y == context.Grid.Height - 1));
     }
 
     [Fact]
@@ -40,6 +43,36 @@ public class AddHeatPipesTest : BasePlannerTest
         options.ValidateSolution = true;
 
         var (context, _) = Planner.Execute(options, ParseBlueprint.Execute(SmallListBlueprintStrings[0]));
+
+        Assert.NotEmpty(context.Grid.GetEntities().OfType<HeatPipe>());
+    }
+
+    [Theory]
+    [MemberData(nameof(SmallListIndexTestData))]
+    public void HeatPipeConstraintAlwaysWorksWithSubstations(int blueprintIndex)
+    {
+        var options = OilFieldOptions.ForSubstation;
+        options.AddHeatPipes = true;
+        options.ValidateSolution = true;
+
+        var (context, _) = Planner.Execute(options, ParseBlueprint.Execute(SmallListBlueprintStrings[blueprintIndex]));
+
+        Assert.NotEmpty(context.Grid.GetEntities().OfType<HeatPipe>());
+    }
+
+    [Theory]
+    [InlineData(38)]
+    [InlineData(41)]
+    [InlineData(48)]
+    [InlineData(60)]
+    public void PreviouslyBlockedLayoutsHaveHeatRoutesWithoutBeacons(int blueprintIndex)
+    {
+        var options = OilFieldOptions.ForSubstation;
+        options.AddBeacons = false;
+        options.AddHeatPipes = true;
+        options.ValidateSolution = true;
+
+        var (context, _) = Planner.Execute(options, ParseBlueprint.Execute(SmallListBlueprintStrings[blueprintIndex]));
 
         Assert.NotEmpty(context.Grid.GetEntities().OfType<HeatPipe>());
     }

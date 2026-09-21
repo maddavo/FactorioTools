@@ -214,6 +214,18 @@ public static class InitializeContext
         maxX += 1 + options.ElectricPoleWidth;
         maxY += 1 + options.ElectricPoleHeight;
 
+        if (options.AddHeatPipes)
+        {
+            // Keep a clear outer corridor for the mandatory, connected Aquilo heat-pipe network. Beacon planning
+            // only considers locations that can affect a pumpjack, and electric poles are added after heat pipes,
+            // so this margin guarantees the pipe router can travel around a dense generated layout.
+            const int heatPipeRouteMargin = 2;
+            minX -= heatPipeRouteMargin;
+            minY -= heatPipeRouteMargin;
+            maxX += heatPipeRouteMargin;
+            maxY += heatPipeRouteMargin;
+        }
+
         deltaX = -minX;
         deltaY = -minY;
 

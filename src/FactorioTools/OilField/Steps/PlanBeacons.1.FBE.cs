@@ -76,7 +76,7 @@ public static class PlanBeaconsFbe
             {
                 continue;
             }
-            
+
             if (!context.Options.OverlapBeacons)
             {
                 var overlapping = new CountedBitArray(beacon.EffectsGiven!);
@@ -355,7 +355,7 @@ public static class PlanBeaconsFbe
             int height;
             bool effect;
 
-            if (entity is TemporaryEntity || entity is AvoidEntity)
+            if (entity is TemporaryEntity || entity is AvoidEntity || entity is HeatPipe)
             {
                 width = 1;
                 height = 1;
