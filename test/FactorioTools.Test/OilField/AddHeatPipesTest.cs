@@ -31,4 +31,16 @@ public class AddHeatPipesTest : BasePlannerTest
 
         Assert.Empty(context.Grid.GetEntities().OfType<HeatPipe>());
     }
+
+    [Fact]
+    public void AddsHeatPipesBeforeSubstationsCanBlockTheRoute()
+    {
+        var options = OilFieldOptions.ForSubstation;
+        options.AddHeatPipes = true;
+        options.ValidateSolution = true;
+
+        var (context, _) = Planner.Execute(options, ParseBlueprint.Execute(SmallListBlueprintStrings[0]));
+
+        Assert.NotEmpty(context.Grid.GetEntities().OfType<HeatPipe>());
+    }
 }

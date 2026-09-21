@@ -163,6 +163,13 @@ public static class Planner
 
         // Visualizer.Show(context.Grid, Array.Empty<DelaunatorSharp.IPoint>(), Array.Empty<DelaunatorSharp.IEdge>());
 
+        // Heat pipes must be placed before electric poles. Large poles, especially substations, can otherwise
+        // surround a group of entities and leave no empty route for the connected Aquilo heat network.
+        if (options.AddHeatPipes)
+        {
+            AddHeatPipes.Execute(context);
+        }
+
         if (options.AddElectricPoles)
         {
             if (!addElectricPolesFirst || context.Options.AddBeacons)
@@ -187,11 +194,6 @@ public static class Planner
             }
 
             Validate.AllEntitiesHavePower(context);
-        }
-
-        if (options.AddHeatPipes)
-        {
-            AddHeatPipes.Execute(context);
         }
 
         var missingPumpjacks = initialPumpjackCount - context.CenterToTerminals.Count;
